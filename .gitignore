@@ -1,4 +1,9 @@
-/node_modules/
-/dist/
-/data/
-npm-debug.log
+node_modules/
+.data/
+*.db
+*.sqlite
+*.log
+.env
+.env.local
+.DS_Store
+coverage/

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marketplace Core Modern | 多供应商市集与分账底座</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --badge-accrued: #fef3c7;
+      --badge-accrued-text: #92400e;
+      --badge-ready: #dbeafe;
+      --badge-ready-text: #1e40af;
+      --badge-settled: #dcfce7;
+      --badge-settled-text: #166534;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); line-height: 1.5; padding-bottom: 60px; }
+
+    header {
+      background: #1e293b;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 1.25rem; font-weight: 700; }
+    .brand-badge { background: #3b82f6; font-size: 0.75rem; padding: 2px 8px; border-radius: 9999px; }
+
+    nav { display: flex; gap: 8px; }
+    nav button {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    nav button:hover, nav button.active {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+
+    .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+    .view-panel { display: none; }
+    .view-panel.active { display: block; animation: fadeIn 0.2s ease-in-out; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+    .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; }
+    
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .product-img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      background: #e2e8f0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-vendor { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .badge-status-accrued { background: var(--badge-accrued); color: var(--badge-accrued-text); }
+    .badge-status-ready { background: var(--badge-ready); color: var(--badge-ready-text); }
+    .badge-status-settled { background: var(--badge-settled); color: var(--badge-settled-text); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f1f5f9; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th { background: #f8fafc; font-weight: 600; color: var(--text-muted); }
+
+    .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: #fff; border: 1px solid var(--border); padding: 1.25rem; border-radius: 8px; }
+    .stat-val { font-size: 1.6rem; font-weight: 700; color: #0f172a; margin-top: 4px; }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+
+    .cart-drawer { position: sticky; top: 1rem; }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 0.9rem; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1e293b;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      display: none;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span>🛒 Marketplace Core Modern</span>
+    <span class="brand-badge">B-Route Modern Rewrite</span>
+  </div>
+  <nav>
+    <button class="active" onclick="switchTab('storefront')">🏪 跨店选品与拆单下单</button>
+    <button onclick="switchTab('seller')">🏬 商家履约中心</button>
+    <button onclick="switchTab('settlement')">💰 卖家结算与分账</button>
+    <button onclick="switchTab('api')">⚡ API & 系统健康</button>
+  </nav>
+</header>
+
+<div class="container">
+  <!-- 1. 跨店选品与拆单下单 -->
+  <section id="tab-storefront" class="view-panel active">
+    <div class="grid-2">
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+          <h2>多供应商在售商品库</h2>
+          <span style="font-size: 0.9rem; color: var(--text-muted);">支持跨店铺联合加购，下单将自动原子拆单</span>
+        </div>
+        <div id="product-list" class="grid-cards">
+          <!-- 动态加载商品 -->
+        </div>
+      </div>
+
+      <!-- 购物车与联合结算 -->
+      <div>
+        <div class="card cart-drawer">
+          <h3 style="margin-bottom: 1rem;">联合购物车</h3>
+          <div id="cart-items" style="min-height: 100px;">
+            <p style="color: var(--text-muted); font-size: 0.9rem;">购物车为空，请从左侧选择不同店铺商品体验拆单。</p>
+          </div>
+          <div style="border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 1rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem; font-weight: 600;">
+              <span>总额：</span>
+              <span id="cart-total" style="color: var(--primary);">¥0.00</span>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; padding: 10px;" onclick="handleCheckout()">
+              🚀 联合结算下单 (自动按店拆单)
+            </button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem;" id="checkout-result-card" style="display: none;">
+          <h4 style="margin-bottom: 0.5rem;">最近拆单结果追踪</h4>
+          <div id="checkout-summary" style="font-size: 0.85rem; color: #334155;">暂无结算数据</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 商家履约中心 -->
+  <section id="tab-seller" class="view-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+      <h2>商家履约管理</h2>
+      <div>
+        <label style="font-size: 0.9rem; margin-right: 8px;">切换查看店铺：</label>
+        <select id="seller-shop-selector" onchange="loadShopOrders()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+          <!-- 动态加载店铺 -->
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>待发货与历史子订单 (Sub-Orders)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>子订单号</th>
+            <th>买家</th>
+            <th>商品清单</th>
+            <th>总金额</th>
+            <th>订单状态</th>
+            <th>结算单联动状态</th>
+            <th>履约操作</th>
+          </tr>
+        </thead>
+        <tbody id="sub-orders-tbody">
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3. 卖家结算与分账 -->
+  <section id="tab-settlement" class="view-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+      <div>
+        <h2>卖家结算与分账独立引擎看板</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">支持平台费率抽成、防退款冷冻期保护（Escrow）与结算生命周期打款</p>
+      </div>
+      <div>
+        <label style="font-size: 0.9rem; margin-right: 8px;">选择店铺：</label>
+        <select id="settlement-shop-selector" onchange="loadSettlementData()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+          <!-- 动态加载店铺 -->
+        </select>
+      </div>
+    </div>
+
+    <!-- 统计指标条 -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-label">累计商品销售额 (Gross)</div>
+        <div class="stat-val" id="stat-gross">¥0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平台抽成与交易费 (Fee)</div>
+        <div class="stat-val" style="color: #ea580c;" id="stat-fees">¥0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">待出账/已就绪 (Ready)</div>
+        <div class="stat-val" style="color: var(--primary);" id="stat-ready">¥0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">已结算打款完成 (Settled)</div>
+        <div class="stat-val" style="color: var(--success);" id="stat-settled">¥0.00</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>结算流水明细表 (Settlement Statements)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>结算单号</th>
+            <th>关联子订单</th>
+            <th>订单总额</th>
+            <th>平台抽成</th>
+            <th>卖家净得</th>
+            <th>结算状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="settlement-tbody">
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 4. API & 系统健康 -->
+  <section id="tab-api" class="view-panel">
+    <div class="grid-2">
+      <div class="card">
+        <h3>服务健康状态与统计</h3>
+        <pre id="health-json" style="background: #0f172a; color: #38bdf8; padding: 1rem; border-radius: 6px; margin-top: 1rem; font-size: 0.85rem; overflow-x: auto;">
+检测中...
+        </pre>
+      </div>
+
+      <div class="card">
+        <h3>分账模拟计算器 (Standalone Simulator)</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">直接调用 SettlementEngine 纯函数试算平台抽成与商家收益</p>
+        <div style="margin-bottom: 10px;">
+          <label style="font-size: 0.85rem;">商品总金额 (¥):</label>
+          <input type="number" id="sim-gross" value="1000" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="font-size: 0.85rem;">平台佣金率 (例如 0.10 代表 10%):</label>
+          <input type="number" id="sim-rate" value="0.10" step="0.01" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+          <label style="font-size: 0.85rem;">单笔固定通道费 (¥):</label>
+          <input type="number" id="sim-fee" value="0.50" step="0.1" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px;">
+        </div>
+        <button class="btn btn-primary" onclick="runSimulation()" style="width: 100%;">试算分账</button>
+
+        <div id="sim-result" style="margin-top: 1rem; font-size: 0.9rem;"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+  let authToken = '';
+  let currentUser = null;
+  let cart = [];
+  let allShops = [];
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+
+    if (tabId === 'seller') loadShopOrders();
+    if (tabId === 'settlement') loadSettlementData();
+    if (tabId === 'api') checkHealth();
+  }
+
+  // 初始化匿名/默认买家登录
+  async function initAuth() {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'buyer@example.local', password: 'Pass12345!' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        authToken = data.data.token;
+        currentUser = data.data.user;
+      }
+    } catch (e) {
+      console.warn('Auth init failed:', e);
+    }
+  }
+
+  async function loadProductsAndShops() {
+    try {
+      const shopRes = await fetch('/api/shops');
+      const shopData = await shopRes.json();
+      allShops = shopData.data || [];
+
+      // 填充店铺下拉框
+      const sel = document.getElementById('seller-shop-selector');
+      const setSel = document.getElementById('settlement-shop-selector');
+      sel.innerHTML = '';
+      setSel.innerHTML = '';
+      allShops.forEach(s => {
+        sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        setSel.innerHTML += `<option value="${s.id}">${s.name} (${s.customCommissionRate ? (s.customCommissionRate*100)+'%' : '默认10%'})</option>`;
+      });
+
+      const prodRes = await fetch('/api/products');
+      const prodData = await prodRes.json();
+      const products = prodData.data.items || [];
+
+      const listDiv = document.getElementById('product-list');
+      listDiv.innerHTML = products.map(p => `
+        <div class="card">
+          <img src="${p.imageUrl}" alt="${p.name}" class="product-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%\' height=\'180\'><rect fill=\'%23e2e8f0\' width=\'100%\' height=\'100%\'/><text fill=\'%2364748b\' x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\'>商品预览</text></svg>'">
+          <span class="badge badge-vendor">${p.shopName}</span>
+          <h4 style="margin: 6px 0 4px 0;">${p.name}</h4>
+          <p style="color: var(--text-muted); font-size: 0.8rem; height: 38px; overflow: hidden;">${p.description}</p>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 10px;">
+            <span style="font-weight:700; color: #dc2626; font-size: 1.1rem;">¥${p.price.toFixed(2)}</span>
+            <button class="btn btn-primary btn-sm" onclick="addToCart('${p.id}', '${escape(p.name)}', ${p.price}, '${p.shopId}', '${escape(p.shopName)}')">加入购物车</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function addToCart(id, name, price, shopId, shopName) {
+    name = unescape(name);
+    shopName = unescape(shopName);
+    const existing = cart.find(c => c.productId === id);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      cart.push({ productId: id, name, price, shopId, shopName, quantity: 1 });
+    }
+    renderCart();
+    showToast(`已添加 "${name}" 到购物车`);
+  }
+
+  function renderCart() {
+    const div = document.getElementById('cart-items');
+    if (cart.length === 0) {
+      div.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem;">购物车为空</p>`;
+      document.getElementById('cart-total').innerText = '¥0.00';
+      return;
+    }
+
+    let total = 0;
+    div.innerHTML = cart.map((it, idx) => {
+      const sub = it.price * it.quantity;
+      total += sub;
+      return `
+        <div class="cart-item">
+          <div>
+            <div><strong>${it.name}</strong></div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${it.shopName}</div>
+          </div>
+          <div>
+            <span>¥${it.price} × ${it.quantity}</span>
+            <button class="btn btn-outline btn-sm" style="margin-left: 6px; padding: 2px 6px;" onclick="removeFromCart(${idx})">×</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('cart-total').innerText = `¥${total.toFixed(2)}`;
+  }
+
+  function removeFromCart(idx) {
+    cart.splice(idx, 1);
+    renderCart();
+  }
+
+  async function handleCheckout() {
+    if (cart.length === 0) {
+      alert('购物车为空，请先添加商品');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/orders/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          items: cart.map(c => ({ productId: c.productId, quantity: c.quantity })),
+          shippingAddress: {
+            recipientName: '张三',
+            phone: '13800000000',
+            addressLine: '上海市徐汇区漕河泾科创园 88 号'
+          }
+        })
+      });
+
+      const result = await res.json();
+      if (!result.success) {
+        alert(result.message);
+        return;
+      }
+
+      showToast('联合下单成功，已按店铺自动拆单！');
+      cart = [];
+      renderCart();
+
+      const summaryCard = document.getElementById('checkout-summary');
+      const mo = result.data.masterOrder;
+      const subs = result.data.subOrders;
+      summaryCard.innerHTML = `
+        <div style="padding: 8px; background: #f8fafc; border-radius: 6px; margin-top: 6px;">
+          <div><strong>主订单号:</strong> ${mo.id} (总额: ¥${mo.totalAmount})</div>
+          <div><strong>拆单总数:</strong> 已拆分为 ${subs.length} 个独立店铺子订单:</div>
+          <ul style="margin-left: 20px; margin-top: 4px;">
+            ${subs.map(s => `<li>${s.shopName}: <strong>${s.id}</strong> (¥${s.totalAmount}) - 状态: ${s.status}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+      loadProductsAndShops();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function loadShopOrders() {
+    const shopId = document.getElementById('seller-shop-selector').value;
+    if (!shopId) return;
+
+    try {
+      const res = await fetch(`/api/orders/shop/${shopId}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const data = await res.json();
+      const list = data.data || [];
+
+      const tbody = document.getElementById('sub-orders-tbody');
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">暂无属于该店铺的子订单</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(so => `
+        <tr>
+          <td><code>${so.id}</code></td>
+          <td>${so.buyerName}</td>
+          <td>${so.items.map(i => `${i.productName}×${i.quantity}`).join(', ')}</td>
+          <td><strong>¥${so.totalAmount}</strong></td>
+          <td><span class="badge" style="background:#f1f5f9;">${so.status}</span></td>
+          <td>
+            ${so.settlement ? `<span class="badge badge-status-${so.settlement.status}">${so.settlement.status} (净¥${so.settlement.sellerNetAmount})</span>` : '-'}
+          </td>
+          <td>
+            ${so.status === 'paid' ? `<button class="btn btn-primary btn-sm" onclick="shipOrder('${so.id}')">发货</button>` : ''}
+            ${so.status === 'shipped' ? `<button class="btn btn-outline btn-sm" onclick="deliverOrder('${so.id}')">买家确认送达</button>` : ''}
+            ${so.status === 'delivered' ? `<span style="color:var(--success); font-size:0.8rem;">已完成履约</span>` : ''}
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function shipOrder(subOrderId) {
+    const num = 'SF' + Math.floor(100000000 + Math.random() * 900000000);
+    const res = await fetch(`/api/orders/sub-orders/${subOrderId}/ship`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ carrier: '顺丰速运', trackingNumber: num })
+    });
+    const d = await res.json();
+    if (d.success) {
+      showToast(`订单已发货，单号: ${num}`);
+      loadShopOrders();
+    }
+  }
+
+  async function deliverOrder(subOrderId) {
+    const res = await fetch(`/api/orders/sub-orders/${subOrderId}/deliver`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+    const d = await res.json();
+    if (d.success) {
+      showToast('买家已确认收货，结算单已就绪 (ready)');
+      loadShopOrders();
+    }
+  }
+
+  async function loadSettlementData() {
+    const shopId = document.getElementById('settlement-shop-selector').value;
+    if (!shopId) return;
+
+    try {
+      const sumRes = await fetch(`/api/settlements/shop/${shopId}/summary`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const sumData = await sumRes.json();
+      if (sumData.success) {
+        const m = sumData.data.metrics;
+        document.getElementById('stat-gross').innerText = `¥${m.totalGross.toFixed(2)}`;
+        document.getElementById('stat-fees').innerText = `¥${m.totalPlatformFees.toFixed(2)}`;
+        document.getElementById('stat-ready').innerText = `¥${m.readyAmount.toFixed(2)}`;
+        document.getElementById('stat-settled').innerText = `¥${m.settledAmount.toFixed(2)}`;
+      }
+
+      const stRes = await fetch(`/api/settlements/shop/${shopId}/statements`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const stData = await stRes.json();
+      const list = stData.data ? stData.data.items : [];
+
+      const tbody = document.getElementById('settlement-tbody');
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">暂无结算单</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(st => `
+        <tr>
+          <td><code>${st.id.slice(0, 18)}...</code></td>
+          <td>${st.subOrderId}</td>
+          <td>¥${st.grossAmount}</td>
+          <td style="color:#ea580c;">-¥${st.platformFee}</td>
+          <td style="color:var(--success); font-weight:700;">¥${st.sellerNetAmount}</td>
+          <td><span class="badge badge-status-${st.status}">${st.status}</span></td>
+          <td>
+            ${st.status === 'ready' ? `<button class="btn btn-primary btn-sm" onclick="payoutStatement('${st.id}')">执行打款</button>` : ''}
+            ${st.status === 'accrued' ? `<span style="font-size:0.75rem; color:var(--text-muted);">冻结锁定期</span>` : ''}
+            ${st.status === 'settled' ? `<span style="color:var(--success); font-size:0.8rem;">已结清 (批次:${st.payoutBatchId?.slice(0,10)})</span>` : ''}
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function payoutStatement(id) {
+    const res = await fetch(`/api/settlements/statements/${id}/payout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ reference: 'WEB-MANUAL-PAY' })
+    });
+    const d = await res.json();
+    if (d.success) {
+      showToast('结算打款已成功出账完成！');
+      loadSettlementData();
+    } else {
+      alert(d.message);
+    }
+  }
+
+  async function checkHealth() {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      document.getElementById('health-json').innerText = JSON.stringify(data, null, 2);
+    } catch (e) {
+      document.getElementById('health-json').innerText = 'Health check failed: ' + e.message;
+    }
+  }
+
+  async function runSimulation() {
+    const gross = parseFloat(document.getElementById('sim-gross').value);
+    const rate = parseFloat(document.getElementById('sim-rate').value);
+    const fee = parseFloat(document.getElementById('sim-fee').value);
+
+    const res = await fetch('/api/settlements/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grossAmount: gross, shopCommissionRate: rate, fixedFee: fee })
+    });
+    const d = await res.json();
+    if (d.success) {
+      const s = d.data;
+      document.getElementById('sim-result').innerHTML = `
+        <div style="background:#f1f5f9; padding:10px; border-radius:6px;">
+          <div>交易总额: <strong>¥${s.grossAmount}</strong></div>
+          <div>平台费率: ${(s.commissionRate*100).toFixed(1)}% + 单笔固定费 ¥${s.fixedFee}</div>
+          <div style="color:#dc2626;">平台应抽成: -¥${s.platformFee}</div>
+          <div style="color:var(--success); font-size:1.1rem; font-weight:700;">卖家净到账: ¥${s.sellerNetAmount}</div>
+        </div>
+      `;
+    }
+  }
+
+  // 页面初始加载
+  (async function() {
+    await initAuth();
+    await loadProductsAndShops();
+  })();
+</script>
+</body>
+</html>
